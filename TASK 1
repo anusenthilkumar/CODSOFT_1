@@ -1,0 +1,169 @@
+#TO DO LIST
+from tkinter import *
+from tkinter import messagebox
+import sqlite3 as sql
+from datetime import datetime
+
+def add_task():
+    task_string = task_field.get()  
+    priority = priority_var.get()
+    if len(task_string) == 0:  
+        messagebox.showinfo('Error', 'Task field is empty!')  
+    else:  
+        tasks.append((task_string, priority))  
+        the_cursor.execute('insert into tasks (title, priority) values (?, ?)', (task_string, priority))    
+        list_update()    
+        task_field.delete(0, 'end')  
+
+def list_update():
+    clear_list()    
+    tasks.sort(key=lambda x: x[1])  # Sort tasks by priority
+    for task in tasks:    
+        task_listbox.insert('end', f"{task[0]} (Priority: {task[1]})")  
+
+def delete_task():  
+    try:  
+        selected_task = task_listbox.get(task_listbox.curselection())    
+        task_name = selected_task.split(' (')[0]
+        if task_name in [task[0] for task in tasks]:  
+            tasks[:] = [task for task in tasks if task[0] != task_name]  # Remove task from list
+            the_cursor.execute('delete from tasks where title = ?', (task_name,))  
+            list_update()  
+    except:   
+        messagebox.showinfo('Error', 'No task selected. Cannot delete.')  
+
+def delete_all_tasks():  
+    message_box = messagebox.askyesno('Delete All', 'Are you sure you want to delete all tasks?')  
+    if message_box == True:    
+        tasks.clear()    
+        the_cursor.execute('delete from tasks')   
+        list_update()  
+
+def clear_list():   
+    task_listbox.delete(0, 'end')  
+
+def close():    
+    print(tasks)   
+    guiWindow.destroy()  
+
+def retrieve_database():    
+    tasks.clear()    
+    for row in the_cursor.execute('select title, priority from tasks'):    
+        tasks.append((row[0], row[1]))  
+
+def edit_task():  
+    try:  
+        selected_task = task_listbox.get(task_listbox.curselection())    
+        task_name = selected_task.split(' (')[0]
+        new_priority = priority_var.get()
+        if task_name in [task[0] for task in tasks]:  
+            tasks[:] = [(task[0], new_priority) if task[0] == task_name else task for task in tasks]  # Update task priority
+            the_cursor.execute('update tasks set priority = ? where title = ?', (new_priority, task_name))  
+            list_update()  
+    except:  
+        messagebox.showinfo('Error', 'No task selected. Cannot edit.')
+
+if __name__ == "__main__":   
+    guiWindow = Tk()   
+    guiWindow.title("Improved To-Do List")  
+    guiWindow.geometry("800x500+550+250")   
+    guiWindow.resizable(0, 0)  
+    guiWindow.configure(bg = "#4CAF50")  # Green background color
+
+    the_connection = sql.connect('improvedTasks.db')   
+    the_cursor = the_connection.cursor()   
+    the_cursor.execute('create table if not exists tasks (title text, priority integer)')  
+    
+    tasks = []  
+        
+    functions_frame = Frame(guiWindow, bg = "#81C784")  # Light green frame
+    
+    functions_frame.pack(side = "top", expand = True, fill = "both")  
+    
+    task_label = Label(functions_frame, text = "To-Do List\nEnter Task Title:",  
+        font = ("Arial", 16, "bold"),  
+        background = "#81C784", 
+        foreground = "#1B5E20"  
+    )    
+    task_label.place(x = 20, y = 30)  
+    
+    task_field = Entry(functions_frame,  
+        font = ("Arial", 14),  
+        width = 45,  
+        foreground = "#424242",  
+        background = "#F1F8E9",  
+    )    
+    task_field.place(x = 180, y = 30)  
+    
+    priority_var = IntVar()  # Priority selection
+    priority_label = Label(functions_frame, text="Priority:", font=("Arial", 14), bg="#81C784", fg="#1B5E20")
+    priority_label.place(x=20, y=90)
+    priority_options = OptionMenu(functions_frame, priority_var, 1, 2, 3, 4, 5)
+    priority_options.place(x=180, y=90)
+
+    add_button = Button(functions_frame,  
+        text = "Add Task",  
+        width = 15,
+        bg = '#FFEB3B',  
+        font = ("Arial", 14, "bold"),
+        command = add_task  
+    )  
+    del_button = Button(functions_frame,  
+        text = "Remove Task",  
+        width = 15,
+        bg = '#FFEB3B', 
+        font = ("Arial", 14, "bold"),
+        command = delete_task  
+    )  
+    del_all_button = Button(functions_frame,  
+        text = "Delete All Tasks",  
+        width = 15,
+        bg = '#FFEB3B', 
+        font = ("Arial", 14, "bold"),
+        command = delete_all_tasks  
+    )
+    
+    edit_button = Button(functions_frame,  
+        text = "Edit Task",  
+        width = 15,
+        bg = '#FFEB3B', 
+        font = ("Arial", 14, "bold"),
+        command = edit_task  
+    )
+
+    exit_button = Button(functions_frame,  
+        text = "Exit",  
+        width = 52,
+        bg = '#FFEB3B',  
+        font = ("Arial", 14, "bold"),
+        command = close  
+    )    
+
+    add_button.place(x = 18, y = 130)  
+    del_button.place(x = 240, y = 130)  
+    del_all_button.place(x = 460, y = 130)  
+    edit_button.place(x = 240, y = 180)  
+    exit_button.place(x = 17, y = 400)  
+    
+    task_listbox = Listbox(functions_frame,  
+        width = 70,  
+        height = 9,  
+        font = ("Arial", 12, "bold"),
+        selectmode = 'SINGLE',  
+        background = "#FFFFFF",  
+        foreground = "#424242",  
+        selectbackground = "#FF7043",  
+        selectforeground = "#FFFFFF"  
+    )    
+
+    task_listbox.place(x = 17, y = 220)  
+    
+    scrollbar = Scrollbar(functions_frame, orient='vertical', command=task_listbox.yview)
+    scrollbar.place(x=650, y=220, height=180)
+    task_listbox.config(yscrollcommand=scrollbar.set)
+    
+    retrieve_database()  
+    list_update()  
+    guiWindow.mainloop()    
+    the_connection.commit()  
+    the_cursor.close()
